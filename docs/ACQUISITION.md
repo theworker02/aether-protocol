@@ -34,7 +34,7 @@ Open Core (A) requires **no** purchase. Acquisition usually means **B + C**, opt
 | Networking | `aether-p2p` | Multi-validator TCP mesh |
 | State | `aether-state` | Dual ledger, staking, gov, rollups |
 | Persistence | `aether-store` | sled + epoch snapshots |
-| RPC / node / CLI | `aether-rpc`, `aether-node`, `aether-cli` | Operable |
+| RPC / node / CLI | `aether-rpc`, `aether-node`, `aether-protocol-cli` | Operable |
 | Explorer | `apps/explorer` | Vite UI |
 | Brand | `assets/brand` | Logo + wordmark |
 | CI | `.github/workflows/ci.yml` | Build + test |

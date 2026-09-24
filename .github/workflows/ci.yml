@@ -16,7 +16,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build
-        run: cargo build -p aether-node -p aether-cli
+        run: cargo build -p aether-node -p aether-protocol-cli
       - name: Test ZK
         run: cargo test -p aether-zk --lib
       - name: Test types/crypto

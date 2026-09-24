@@ -95,7 +95,7 @@ Most chains force a single trade-off: public *or* permissioned, accounts *or* UT
 | `aether-vm` | AetherOps prototype ISA |
 | `aether-state` | Ledger, staking, adapters |
 | `aether-store` | sled + epoch snapshots |
-| `aether-rpc` / `aether-node` / `aether-cli` | Operator surface |
+| `aether-rpc` / `aether-node` / `aether-protocol-cli` | Operator surface |
 
 ---
 
@@ -104,7 +104,7 @@ Most chains force a single trade-off: public *or* permissioned, accounts *or* UT
 ```bash
 git clone https://github.com/theworker02/aether-protocol.git
 cd aether-protocol
-cargo build -p aether-node -p aether-cli
+cargo build -p aether-node -p aether-protocol-cli
 
 cargo run -p aether-node -- \
   --config config/node.toml \
@@ -127,10 +127,10 @@ cargo run -p aether-node -- \
 CLI:
 
 ```bash
-cargo run -p aether-cli -- info
-cargo run -p aether-cli -- bond --secret <hex32> --amount 10000000000000
-cargo run -p aether-cli -- delegate --secret <hex32> --validator 0x... --amount 1000000000
-cargo run -p aether-cli -- shield --secret <hex32> --value 1000000000 --note-out note.json
+cargo run -p aether-protocol-cli -- info
+cargo run -p aether-protocol-cli -- bond --secret <hex32> --amount 10000000000000
+cargo run -p aether-protocol-cli -- delegate --secret <hex32> --validator 0x... --amount 1000000000
+cargo run -p aether-protocol-cli -- shield --secret <hex32> --value 1000000000 --note-out note.json
 ```
 
 Explorer: `cd apps/explorer && npm i && npm run dev` → http://127.0.0.1:5173

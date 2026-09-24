@@ -6,4 +6,4 @@
 *.pem
 data/
 validator.key
-.DS_Store
+*.tsbuildinfo

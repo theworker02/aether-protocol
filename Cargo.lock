@@ -3,25 +3,6 @@
 version = 4
 
 [[package]]
-name = "aether-cli"
-version = "1.3.0"
-dependencies = [
- "aether-crypto",
- "aether-types",
- "aether-zk",
- "anyhow",
- "ark-bn254",
- "ark-ff",
- "clap",
- "hex",
- "rand",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "aether-consensus"
 version = "1.3.0"
 dependencies = [
@@ -87,6 +68,25 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "aether-protocol-cli"
+version = "1.3.0"
+dependencies = [
+ "aether-crypto",
+ "aether-types",
+ "aether-zk",
+ "anyhow",
+ "ark-bn254",
+ "ark-ff",
+ "clap",
+ "hex",
+ "rand",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

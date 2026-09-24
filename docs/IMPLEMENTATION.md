@@ -3,7 +3,7 @@
 ## Crate graph
 
 ```
-aether-cli ──┐
+aether-protocol-cli ──┐
              ├── aether-types
 aether-node ─┤
              ├── aether-crypto

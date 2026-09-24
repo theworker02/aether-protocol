@@ -6,7 +6,7 @@ Thanks for helping improve Aether Protocol.
 
 ```bash
 rustup update stable
-cargo build -p aether-node -p aether-cli
+cargo build -p aether-node -p aether-protocol-cli
 cargo test -p aether-zk --lib
 cd apps/explorer && npm install && npm run build
 ```

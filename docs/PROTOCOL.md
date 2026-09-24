@@ -475,7 +475,7 @@ Aether’s hybrid design supports public commons and regulated consortium deploy
 | State | `aether-state` |
 | RPC | `aether-rpc` |
 | Node binary | `aether-node` |
-| CLI | `aether-cli` |
+| CLI | `aether-protocol-cli` |
 | Explorer + wallet | `apps/explorer` |
 
 ---

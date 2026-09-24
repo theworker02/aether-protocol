@@ -2,7 +2,7 @@ FROM rust:1.81-bookworm AS builder
 WORKDIR /src
 COPY Cargo.toml ./
 COPY crates ./crates
-RUN cargo build --release -p aether-node -p aether-cli
+RUN cargo build --release -p aether-node -p aether-protocol-cli
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
