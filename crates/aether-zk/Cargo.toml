@@ -1,0 +1,35 @@
+[package]
+name = "aether-zk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Poseidon CRH, Groth16 shielded notes, and rollup verifiers for Aether"
+readme = "../../README.md"
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+aether-types = { workspace = true }
+aether-crypto = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+blake3 = { workspace = true }
+rand = { workspace = true }
+parking_lot = { workspace = true }
+ark-std = { workspace = true }
+ark-ff = { workspace = true }
+ark-ec = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-groth16 = { workspace = true }
+ark-relations = { workspace = true }
+ark-r1cs-std = { workspace = true }
+ark-snark = { workspace = true }
+ark-serialize = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -1,0 +1,28 @@
+services:
+  aether-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8545:8545"
+    command: ["aether-node", "--rpc", "0.0.0.0:8545", "--hybrid", "public", "--block-time-ms", "1000"]
+    volumes:
+      - aether-data:/data
+    environment:
+      - RUST_LOG=info
+
+  explorer:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./apps/explorer:/app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_RPC_URL=http://localhost:8545
+    depends_on:
+      - aether-node
+
+volumes:
+  aether-data:

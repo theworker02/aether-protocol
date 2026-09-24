@@ -1,0 +1,23 @@
+[package]
+name = "aether-p2p"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Multi-validator TCP gossip mesh for Aether Protocol"
+readme = "../../README.md"
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+aether-types = { workspace = true }
+aether-crypto = { workspace = true }
+aether-consensus = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+hex = { workspace = true }

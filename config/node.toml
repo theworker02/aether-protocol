@@ -1,0 +1,22 @@
+# Aether node configuration (TOML)
+# Copy to config/node.local.toml and edit. Flags override these values.
+
+chain_id = "aether-devnet-1"
+rpc = "127.0.0.1:8545"
+hybrid = "public"          # public | allowlist | mixed
+block_time_ms = 1000
+faucet_aeth = 1000000
+genesis = "config/genesis.public.json"
+zk_keys = "data/zk_keys.json"
+# key_file = "validator.key"
+p2p_listen = "127.0.0.1:9000"
+# bootnodes = ["127.0.0.1:9001"]
+
+[limits]
+mempool_max_txs = 5000
+rpc_max_body_bytes = 4194304
+
+[features]
+enable_shielded = true
+enable_rollups = true
+allow_noop_rollup = false

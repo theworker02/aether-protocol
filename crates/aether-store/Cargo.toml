@@ -1,0 +1,23 @@
+[package]
+name = "aether-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Sled-backed persistence and epoch snapshots for Aether Protocol"
+readme = "../../README.md"
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+aether-types = { workspace = true }
+aether-state = { workspace = true }
+aether-crypto = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+sled = "0.34"
+hex = { workspace = true }
+tracing = { workspace = true }

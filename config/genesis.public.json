@@ -1,0 +1,17 @@
+{
+  "chain_id": "aether-devnet-1",
+  "timestamp": 0,
+  "params": {
+    "chain_id": "aether-devnet-1",
+    "epoch_length": 100,
+    "min_validator_stake": "10000000000000",
+    "max_validators": 100,
+    "unbonding_period": 21,
+    "gas_limit": 30000000,
+    "hybrid_mode": "public",
+    "block_time_ms": 1000
+  },
+  "alloc": [],
+  "validators": [],
+  "notes": "Public permissionless mode. Alloc/validators are filled by aether-node from --faucet / key if empty."
+}

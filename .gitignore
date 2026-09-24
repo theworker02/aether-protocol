@@ -1,0 +1,9 @@
+/target
+**/target
+/apps/explorer/node_modules
+/apps/explorer/dist
+.env
+*.pem
+data/
+validator.key
+.DS_Store

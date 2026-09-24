@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 240" role="img" aria-label="Aether Protocol">
+  <defs>
+    <linearGradient id="beam" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0f6b5c"/>
+      <stop offset="100%" stop-color="#c8f542"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(24,24) scale(0.375)">
+    <rect width="512" height="512" rx="96" fill="#0b1c1a"/>
+    <path d="M96 340 C180 280, 332 280, 416 340" fill="none" stroke="#0f6b5c" stroke-width="14" stroke-linecap="round" opacity="0.55"/>
+    <path d="M256 108 L118 372" fill="none" stroke="url(#beam)" stroke-width="36" stroke-linecap="round"/>
+    <path d="M256 108 L394 372" fill="none" stroke="url(#beam)" stroke-width="36" stroke-linecap="round"/>
+    <path d="M176 268 H336" fill="none" stroke="#c8f542" stroke-width="28" stroke-linecap="round"/>
+    <circle cx="256" cy="108" r="22" fill="#c8f542"/>
+  </g>
+  <text x="260" y="152" font-family="Syne, Segoe UI, Helvetica, Arial, sans-serif" font-size="96" font-weight="800" fill="#e8f2ef" letter-spacing="-3">Aether</text>
+  <text x="260" y="198" font-family="IBM Plex Mono, Consolas, monospace" font-size="22" fill="#c5ddd6" letter-spacing="4">PROTOCOL</text>
+</svg>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Aether Protocol">
+  <defs>
+    <linearGradient id="beam" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0f6b5c"/>
+      <stop offset="100%" stop-color="#c8f542"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#041210"/>
+      <stop offset="100%" stop-color="#0b1c1a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Horizon arc -->
+  <path d="M96 340 C180 280, 332 280, 416 340" fill="none" stroke="#0f6b5c" stroke-width="14" stroke-linecap="round" opacity="0.55"/>
+  <!-- A beams -->
+  <path d="M256 108 L118 372" fill="none" stroke="url(#beam)" stroke-width="36" stroke-linecap="round"/>
+  <path d="M256 108 L394 372" fill="none" stroke="url(#beam)" stroke-width="36" stroke-linecap="round"/>
+  <!-- Crossbar -->
+  <path d="M176 268 H336" fill="none" stroke="#c8f542" stroke-width="28" stroke-linecap="round"/>
+  <!-- Apex node -->
+  <circle cx="256" cy="108" r="22" fill="#c8f542"/>
+</svg>
