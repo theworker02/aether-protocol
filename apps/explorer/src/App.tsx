@@ -316,7 +316,7 @@ const brand: CSSProperties = {
 };
 
 const lede: CSSProperties = {
-  maxWidth: 34rem,
+  maxWidth: "34rem",
   fontSize: "1.15rem",
   lineHeight: 1.5,
   color: "var(--mist)",
