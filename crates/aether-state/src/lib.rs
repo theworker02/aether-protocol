@@ -87,6 +87,28 @@ pub struct ChainState {
     /// Evidence hashes already processed (anti-replay).
     #[serde(default)]
     pub evidence_seen: HashSet<String>,
+    /// Brokerless markets: registered assets (native AETH is implicit).
+    #[serde(default)]
+    pub assets: BTreeMap<String, AssetMeta>,
+    /// Secondary asset balances: "addr_hex|asset_hex" → amount.
+    #[serde(default)]
+    pub asset_balances: BTreeMap<String, u128>,
+    /// Resting limit orders (id → order).
+    #[serde(default)]
+    pub orders: BTreeMap<u64, LimitOrder>,
+    #[serde(default)]
+    pub next_order_id: u64,
+    /// Constant-product AMM pools.
+    #[serde(default)]
+    pub pools: BTreeMap<String, AmmPool>,
+    /// Hashlock escrows for P2P atomic settlement.
+    #[serde(default)]
+    pub escrows: BTreeMap<u64, Escrow>,
+    #[serde(default)]
+    pub next_escrow_id: u64,
+    /// Native AETH locked in open orders + escrows + AMM reserves.
+    #[serde(default)]
+    pub market_locked_native: u128,
 }
 
 impl ChainState {
@@ -152,6 +174,14 @@ impl ChainState {
             bridge_packets: BTreeMap::new(),
             slash_log: Vec::new(),
             evidence_seen: HashSet::new(),
+            assets: BTreeMap::new(),
+            asset_balances: BTreeMap::new(),
+            orders: BTreeMap::new(),
+            next_order_id: 1,
+            pools: BTreeMap::new(),
+            escrows: BTreeMap::new(),
+            next_escrow_id: 1,
+            market_locked_native: 0,
         }
     }
 
@@ -204,6 +234,17 @@ impl ChainState {
         let rollups_root = hash_bytes(&serde_json::to_vec(&self.rollups).unwrap_or_default());
         let validator_set_root =
             hash_bytes(&serde_json::to_vec(&self.validators).unwrap_or_default());
+        let markets_root = hash_bytes(
+            &serde_json::to_vec(&(
+                &self.assets,
+                &self.asset_balances,
+                &self.orders,
+                &self.pools,
+                &self.escrows,
+                self.market_locked_native,
+            ))
+            .unwrap_or_default(),
+        );
         composite_state_root(&[
             &accounts_root,
             &utxo_root,
@@ -212,6 +253,7 @@ impl ChainState {
             &nullifiers_root,
             &rollups_root,
             &validator_set_root,
+            &markets_root,
         ])
     }
 
@@ -249,7 +291,8 @@ impl ChainState {
             .saturating_add(deposits)
             .saturating_add(unbonding_locked)
             .saturating_add(delegated)
-            .saturating_add(self.community_pool);
+            .saturating_add(self.community_pool)
+            .saturating_add(self.market_locked_native);
         if lhs != self.genesis_supply {
             return Err(StateError::InvalidTx(format!(
                 "supply invariant broken: lhs={lhs} genesis={}",
@@ -276,6 +319,7 @@ impl ChainState {
         n.saturating_add(self.shielded_value)
             .saturating_add(self.fee_burned)
             .saturating_add(self.community_pool)
+            .saturating_add(self.market_locked_native)
     }
 
     pub fn light_account_proof(&self, addr: &Address) -> AccountProof {
@@ -481,6 +525,96 @@ impl ChainState {
             } => self.apply_bridge_ack(channel_id, *sequence, acknowledgement, &mut gas_used),
             TxKind::CommunityPoolSpend { to, amount, memo } => {
                 self.apply_pool_spend(&sender, to, *amount, memo, &mut gas_used)
+            }
+            TxKind::MarketRegisterAsset {
+                symbol,
+                decimals,
+                supply,
+            } => self.apply_market_register(&sender, symbol, *decimals, *supply, &mut gas_used),
+            TxKind::MarketPostOrder {
+                side,
+                base,
+                quote,
+                price_num,
+                amount,
+                expiry_height,
+            } => self.apply_market_post(
+                &sender,
+                *side,
+                *base,
+                *quote,
+                *price_num,
+                *amount,
+                *expiry_height,
+                &mut gas_used,
+            ),
+            TxKind::MarketCancelOrder { order_id } => {
+                self.apply_market_cancel(&sender, *order_id, &mut gas_used)
+            }
+            TxKind::MarketFillOrder { order_id, amount } => {
+                self.apply_market_fill(&sender, *order_id, *amount, &mut gas_used)
+            }
+            TxKind::AmmCreatePool {
+                asset_a,
+                asset_b,
+                amount_a,
+                amount_b,
+                fee_bps,
+            } => self.apply_amm_create(
+                &sender,
+                *asset_a,
+                *asset_b,
+                *amount_a,
+                *amount_b,
+                *fee_bps,
+                &mut gas_used,
+            ),
+            TxKind::AmmAddLiquidity {
+                pool_id,
+                amount_a,
+                amount_b,
+            } => self.apply_amm_add(&sender, *pool_id, *amount_a, *amount_b, &mut gas_used),
+            TxKind::AmmRemoveLiquidity {
+                pool_id,
+                lp_shares,
+            } => self.apply_amm_remove(&sender, *pool_id, *lp_shares, &mut gas_used),
+            TxKind::AmmSwap {
+                pool_id,
+                asset_in,
+                amount_in,
+                min_out,
+            } => self.apply_amm_swap(
+                &sender,
+                *pool_id,
+                *asset_in,
+                *amount_in,
+                *min_out,
+                &mut gas_used,
+            ),
+            TxKind::EscrowOpen {
+                recipient,
+                asset,
+                amount,
+                hashlock,
+                timeout_height,
+            } => self.apply_escrow_open(
+                &sender,
+                *recipient,
+                *asset,
+                *amount,
+                *hashlock,
+                *timeout_height,
+                &mut gas_used,
+            ),
+            TxKind::EscrowClaim {
+                escrow_id,
+                preimage,
+            } => self.apply_escrow_claim(&sender, *escrow_id, preimage, &mut gas_used),
+            TxKind::EscrowRefund { escrow_id } => {
+                self.apply_escrow_refund(&sender, *escrow_id, &mut gas_used)
+            }
+            TxKind::SettleBatch { fills } => {
+                self.apply_settle_batch(&sender, fills, &mut gas_used)
             }
         };
 
@@ -1676,6 +1810,611 @@ impl ChainState {
         Ok(())
     }
 
+    fn is_native(asset: &Hash256) -> bool {
+        *asset == NATIVE_ASSET
+    }
+
+    fn asset_bal_key(addr: &Address, asset: &Hash256) -> String {
+        format!("{}|{}", hex::encode(addr), hex::encode(asset))
+    }
+
+    fn get_asset_balance(&self, addr: &Address, asset: &Hash256) -> u128 {
+        if Self::is_native(asset) {
+            self.get_balance(addr)
+        } else {
+            self.asset_balances
+                .get(&Self::asset_bal_key(addr, asset))
+                .copied()
+                .unwrap_or(0)
+        }
+    }
+
+    fn debit_asset(
+        &mut self,
+        addr: &Address,
+        asset: &Hash256,
+        amount: u128,
+    ) -> Result<(), StateError> {
+        if amount == 0 {
+            return Ok(());
+        }
+        if Self::is_native(asset) {
+            let key = Self::acct_key(addr);
+            let acct = self.accounts.entry(key).or_default();
+            if acct.balance < amount {
+                return Err(StateError::InsufficientBalance);
+            }
+            acct.balance -= amount;
+        } else {
+            let key = Self::asset_bal_key(addr, asset);
+            let bal = self.asset_balances.entry(key).or_insert(0);
+            if *bal < amount {
+                return Err(StateError::InsufficientBalance);
+            }
+            *bal -= amount;
+        }
+        Ok(())
+    }
+
+    fn credit_asset(&mut self, addr: &Address, asset: &Hash256, amount: u128) {
+        if amount == 0 {
+            return;
+        }
+        if Self::is_native(asset) {
+            self.accounts
+                .entry(Self::acct_key(addr))
+                .or_default()
+                .balance += amount;
+        } else {
+            let key = Self::asset_bal_key(addr, asset);
+            *self.asset_balances.entry(key).or_insert(0) += amount;
+        }
+    }
+
+    fn lock_native(&mut self, amount: u128) {
+        self.market_locked_native = self.market_locked_native.saturating_add(amount);
+    }
+
+    fn unlock_native(&mut self, amount: u128) {
+        self.market_locked_native = self.market_locked_native.saturating_sub(amount);
+    }
+
+    fn quote_for_base(base_amount: u128, price_num: u128) -> Result<u128, StateError> {
+        base_amount
+            .checked_mul(price_num)
+            .and_then(|v| v.checked_div(PRICE_SCALE))
+            .filter(|v| *v > 0 || base_amount == 0)
+            .ok_or_else(|| StateError::InvalidTx("quote overflow".into()))
+    }
+
+    fn apply_market_register(
+        &mut self,
+        from: &Address,
+        symbol: &str,
+        decimals: u8,
+        supply: u128,
+        gas_used: &mut u64,
+    ) -> Result<(), StateError> {
+        *gas_used += 50_000;
+        if symbol.is_empty() || symbol.len() > 16 || !symbol.chars().all(|c| c.is_ascii_alphanumeric())
+        {
+            return Err(StateError::InvalidTx("bad symbol".into()));
+        }
+        if supply == 0 {
+            return Err(StateError::InvalidTx("zero supply".into()));
+        }
+        let asset_id = hash_bytes(
+            &[
+                b"aether-asset",
+                from.as_slice(),
+                symbol.as_bytes(),
+                &supply.to_le_bytes(),
+            ]
+            .concat(),
+        );
+        let key = hex::encode(asset_id);
+        if self.assets.contains_key(&key) {
+            return Err(StateError::InvalidTx("asset exists".into()));
+        }
+        self.assets.insert(
+            key,
+            AssetMeta {
+                asset_id,
+                symbol: symbol.to_string(),
+                decimals,
+                issuer: *from,
+                total_supply: supply,
+            },
+        );
+        self.credit_asset(from, &asset_id, supply);
+        Ok(())
+    }
+
+    fn apply_market_post(
+        &mut self,
+        from: &Address,
+        side: OrderSide,
+        base: Hash256,
+        quote: Hash256,
+        price_num: u128,
+        amount: u128,
+        expiry_height: u64,
+        gas_used: &mut u64,
+    ) -> Result<(), StateError> {
+        *gas_used += 55_000;
+        if amount == 0 || price_num == 0 || base == quote {
+            return Err(StateError::InvalidTx("bad order params".into()));
+        }
+        if expiry_height != 0 && expiry_height <= self.height {
+            return Err(StateError::InvalidTx("already expired".into()));
+        }
+        let quote_amt = Self::quote_for_base(amount, price_num)?;
+        let (lock_asset, lock_amt) = match side {
+            OrderSide::Sell => (base, amount),
+            OrderSide::Buy => (quote, quote_amt),
+        };
+        self.debit_asset(from, &lock_asset, lock_amt)?;
+        let mut locked_native = 0u128;
+        if Self::is_native(&lock_asset) {
+            self.lock_native(lock_amt);
+            locked_native = lock_amt;
+        }
+        let id = self.next_order_id;
+        self.next_order_id = self.next_order_id.saturating_add(1);
+        self.orders.insert(
+            id,
+            LimitOrder {
+                id,
+                maker: *from,
+                side,
+                base,
+                quote,
+                price_num,
+                amount_remaining: amount,
+                expiry_height,
+                locked_native,
+                status: "open".into(),
+            },
+        );
+        Ok(())
+    }
+
+    fn apply_market_cancel(
+        &mut self,
+        from: &Address,
+        order_id: u64,
+        gas_used: &mut u64,
+    ) -> Result<(), StateError> {
+        *gas_used += 30_000;
+        let order = self
+            .orders
+            .get(&order_id)
+            .cloned()
+            .ok_or_else(|| StateError::InvalidTx("order missing".into()))?;
+        if order.maker != *from {
+            return Err(StateError::InvalidTx("not maker".into()));
+        }
+        if order.status != "open" {
+            return Err(StateError::InvalidTx("not open".into()));
+        }
+        let refund_asset = match order.side {
+            OrderSide::Sell => order.base,
+            OrderSide::Buy => order.quote,
+        };
+        let refund = match order.side {
+            OrderSide::Sell => order.amount_remaining,
+            OrderSide::Buy => Self::quote_for_base(order.amount_remaining, order.price_num)?,
+        };
+        let locked_native = order.locked_native.min(refund);
+        if let Some(o) = self.orders.get_mut(&order_id) {
+            o.amount_remaining = 0;
+            o.locked_native = 0;
+            o.status = "cancelled".into();
+        }
+        if Self::is_native(&refund_asset) {
+            self.unlock_native(locked_native);
+        }
+        self.credit_asset(&order.maker, &refund_asset, refund);
+        Ok(())
+    }
+
+    fn apply_market_fill(
+        &mut self,
+        taker: &Address,
+        order_id: u64,
+        amount: u128,
+        gas_used: &mut u64,
+    ) -> Result<(), StateError> {
+        *gas_used += 70_000;
+        self.fill_order(taker, order_id, amount)
+    }
+
+    fn fill_order(
+        &mut self,
+        taker: &Address,
+        order_id: u64,
+        amount: u128,
+    ) -> Result<(), StateError> {
+        if amount == 0 {
+            return Err(StateError::InvalidTx("zero fill".into()));
+        }
+        let order = self
+            .orders
+            .get(&order_id)
+            .cloned()
+            .ok_or_else(|| StateError::InvalidTx("order missing".into()))?;
+        if order.status != "open" {
+            return Err(StateError::InvalidTx("not open".into()));
+        }
+        if order.expiry_height != 0 && self.height >= order.expiry_height {
+            return Err(StateError::InvalidTx("expired".into()));
+        }
+        if amount > order.amount_remaining {
+            return Err(StateError::InvalidTx("overfill".into()));
+        }
+        let quote_amt = Self::quote_for_base(amount, order.price_num)?;
+        match order.side {
+            OrderSide::Sell => {
+                // Maker sold base (already locked). Taker pays quote, receives base.
+                self.debit_asset(taker, &order.quote, quote_amt)?;
+                self.credit_asset(taker, &order.base, amount);
+                self.credit_asset(&order.maker, &order.quote, quote_amt);
+                if Self::is_native(&order.base) {
+                    self.unlock_native(amount);
+                }
+            }
+            OrderSide::Buy => {
+                // Maker locked quote. Taker delivers base, receives quote.
+                self.debit_asset(taker, &order.base, amount)?;
+                self.credit_asset(taker, &order.quote, quote_amt);
+                self.credit_asset(&order.maker, &order.base, amount);
+                if Self::is_native(&order.quote) {
+                    self.unlock_native(quote_amt);
+                }
+            }
+        }
+        let o = self.orders.get_mut(&order_id).unwrap();
+        o.amount_remaining -= amount;
+        o.locked_native = o.locked_native.saturating_sub(match o.side {
+            OrderSide::Sell => amount,
+            OrderSide::Buy => quote_amt,
+        });
+        if o.amount_remaining == 0 {
+            o.status = "filled".into();
+        }
+        Ok(())
+    }
+
+    fn apply_settle_batch(
+        &mut self,
+        taker: &Address,
+        fills: &[SettleFill],
+        gas_used: &mut u64,
+    ) -> Result<(), StateError> {
+        *gas_used += 40_000 + (fills.len() as u64) * 25_000;
+        if fills.is_empty() || fills.len() > 64 {
+            return Err(StateError::InvalidTx("bad batch size".into()));
+        }
+        for f in fills {
+            self.fill_order(taker, f.order_id, f.amount)?;
+        }
+        Ok(())
+    }
+
+    fn apply_amm_create(
+        &mut self,
+        from: &Address,
+        asset_a: Hash256,
+        asset_b: Hash256,
+        amount_a: u128,
+        amount_b: u128,
+        fee_bps: u16,
+        gas_used: &mut u64,
+    ) -> Result<(), StateError> {
+        *gas_used += 80_000;
+        if asset_a == asset_b || amount_a == 0 || amount_b == 0 || fee_bps > 10_000 {
+            return Err(StateError::InvalidTx("bad pool params".into()));
+        }
+        let pool_id = hash_bytes(
+            &[
+                b"aether-amm",
+                from.as_slice(),
+                asset_a.as_slice(),
+                asset_b.as_slice(),
+                &amount_a.to_le_bytes(),
+                &amount_b.to_le_bytes(),
+            ]
+            .concat(),
+        );
+        let key = hex::encode(pool_id);
+        if self.pools.contains_key(&key) {
+            return Err(StateError::InvalidTx("pool exists".into()));
+        }
+        self.debit_asset(from, &asset_a, amount_a)?;
+        self.debit_asset(from, &asset_b, amount_b)?;
+        if Self::is_native(&asset_a) {
+            self.lock_native(amount_a);
+        }
+        if Self::is_native(&asset_b) {
+            self.lock_native(amount_b);
+        }
+        let lp = integer_sqrt(amount_a.saturating_mul(amount_b)).max(1);
+        let mut shares = BTreeMap::new();
+        shares.insert(Self::acct_key(from), lp);
+        self.pools.insert(
+            key,
+            AmmPool {
+                pool_id,
+                asset_a,
+                asset_b,
+                reserve_a: amount_a,
+                reserve_b: amount_b,
+                lp_supply: lp,
+                fee_bps,
+                lp_shares: shares,
+            },
+        );
+        Ok(())
+    }
+
+    fn apply_amm_add(
+        &mut self,
+        from: &Address,
+        pool_id: Hash256,
+        amount_a: u128,
+        amount_b: u128,
+        gas_used: &mut u64,
+    ) -> Result<(), StateError> {
+        *gas_used += 60_000;
+        let key = hex::encode(pool_id);
+        let pool = self
+            .pools
+            .get(&key)
+            .cloned()
+            .ok_or_else(|| StateError::InvalidTx("pool missing".into()))?;
+        if amount_a == 0 || amount_b == 0 {
+            return Err(StateError::InvalidTx("zero liquidity".into()));
+        }
+        // Require proportional deposit within 1%
+        let expect_b = amount_a
+            .checked_mul(pool.reserve_b)
+            .and_then(|v| v.checked_div(pool.reserve_a.max(1)))
+            .unwrap_or(0);
+        let drift = amount_b.abs_diff(expect_b);
+        if expect_b > 0 && drift * 100 > expect_b {
+            return Err(StateError::InvalidTx("imbalanced add".into()));
+        }
+        self.debit_asset(from, &pool.asset_a, amount_a)?;
+        self.debit_asset(from, &pool.asset_b, amount_b)?;
+        if Self::is_native(&pool.asset_a) {
+            self.lock_native(amount_a);
+        }
+        if Self::is_native(&pool.asset_b) {
+            self.lock_native(amount_b);
+        }
+        let minted = amount_a
+            .checked_mul(pool.lp_supply)
+            .and_then(|v| v.checked_div(pool.reserve_a.max(1)))
+            .unwrap_or(0)
+            .max(1);
+        let p = self.pools.get_mut(&key).unwrap();
+        p.reserve_a += amount_a;
+        p.reserve_b += amount_b;
+        p.lp_supply += minted;
+        *p.lp_shares.entry(Self::acct_key(from)).or_insert(0) += minted;
+        Ok(())
+    }
+
+    fn apply_amm_remove(
+        &mut self,
+        from: &Address,
+        pool_id: Hash256,
+        lp_shares: u128,
+        gas_used: &mut u64,
+    ) -> Result<(), StateError> {
+        *gas_used += 55_000;
+        let key = hex::encode(pool_id);
+        let pool = self
+            .pools
+            .get(&key)
+            .cloned()
+            .ok_or_else(|| StateError::InvalidTx("pool missing".into()))?;
+        let owned = pool
+            .lp_shares
+            .get(&Self::acct_key(from))
+            .copied()
+            .unwrap_or(0);
+        if lp_shares == 0 || lp_shares > owned {
+            return Err(StateError::InvalidTx("bad lp amount".into()));
+        }
+        let out_a = lp_shares
+            .checked_mul(pool.reserve_a)
+            .and_then(|v| v.checked_div(pool.lp_supply.max(1)))
+            .unwrap_or(0);
+        let out_b = lp_shares
+            .checked_mul(pool.reserve_b)
+            .and_then(|v| v.checked_div(pool.lp_supply.max(1)))
+            .unwrap_or(0);
+        let p = self.pools.get_mut(&key).unwrap();
+        p.reserve_a -= out_a;
+        p.reserve_b -= out_b;
+        p.lp_supply -= lp_shares;
+        let entry = p.lp_shares.entry(Self::acct_key(from)).or_insert(0);
+        *entry -= lp_shares;
+        if Self::is_native(&pool.asset_a) {
+            self.unlock_native(out_a);
+        }
+        if Self::is_native(&pool.asset_b) {
+            self.unlock_native(out_b);
+        }
+        self.credit_asset(from, &pool.asset_a, out_a);
+        self.credit_asset(from, &pool.asset_b, out_b);
+        Ok(())
+    }
+
+    fn apply_amm_swap(
+        &mut self,
+        from: &Address,
+        pool_id: Hash256,
+        asset_in: Hash256,
+        amount_in: u128,
+        min_out: u128,
+        gas_used: &mut u64,
+    ) -> Result<(), StateError> {
+        *gas_used += 65_000;
+        let key = hex::encode(pool_id);
+        let pool = self
+            .pools
+            .get(&key)
+            .cloned()
+            .ok_or_else(|| StateError::InvalidTx("pool missing".into()))?;
+        if amount_in == 0 {
+            return Err(StateError::InvalidTx("zero swap".into()));
+        }
+        let (reserve_in, reserve_out, asset_out) = if asset_in == pool.asset_a {
+            (pool.reserve_a, pool.reserve_b, pool.asset_b)
+        } else if asset_in == pool.asset_b {
+            (pool.reserve_b, pool.reserve_a, pool.asset_a)
+        } else {
+            return Err(StateError::InvalidTx("asset not in pool".into()));
+        };
+        let fee_mul = 10_000u128.saturating_sub(pool.fee_bps as u128);
+        let amount_in_with_fee = amount_in
+            .checked_mul(fee_mul)
+            .ok_or_else(|| StateError::InvalidTx("fee overflow".into()))?
+            / 10_000;
+        let numerator = amount_in_with_fee
+            .checked_mul(reserve_out)
+            .ok_or_else(|| StateError::InvalidTx("swap overflow".into()))?;
+        let denominator = reserve_in
+            .checked_add(amount_in_with_fee)
+            .ok_or_else(|| StateError::InvalidTx("swap overflow".into()))?;
+        let amount_out = numerator / denominator;
+        if amount_out < min_out {
+            return Err(StateError::InvalidTx("slippage".into()));
+        }
+        self.debit_asset(from, &asset_in, amount_in)?;
+        if Self::is_native(&asset_in) {
+            self.lock_native(amount_in);
+        }
+        if Self::is_native(&asset_out) {
+            self.unlock_native(amount_out);
+        }
+        self.credit_asset(from, &asset_out, amount_out);
+        let p = self.pools.get_mut(&key).unwrap();
+        if asset_in == p.asset_a {
+            p.reserve_a += amount_in;
+            p.reserve_b -= amount_out;
+        } else {
+            p.reserve_b += amount_in;
+            p.reserve_a -= amount_out;
+        }
+        Ok(())
+    }
+
+    fn apply_escrow_open(
+        &mut self,
+        from: &Address,
+        recipient: Address,
+        asset: Hash256,
+        amount: u128,
+        hashlock: Hash256,
+        timeout_height: u64,
+        gas_used: &mut u64,
+    ) -> Result<(), StateError> {
+        *gas_used += 45_000;
+        if amount == 0 || timeout_height <= self.height {
+            return Err(StateError::InvalidTx("bad escrow params".into()));
+        }
+        if hashlock == zero_hash() {
+            return Err(StateError::InvalidTx("empty hashlock".into()));
+        }
+        self.debit_asset(from, &asset, amount)?;
+        if Self::is_native(&asset) {
+            self.lock_native(amount);
+        }
+        let id = self.next_escrow_id;
+        self.next_escrow_id = self.next_escrow_id.saturating_add(1);
+        self.escrows.insert(
+            id,
+            Escrow {
+                id,
+                sender: *from,
+                recipient,
+                asset,
+                amount,
+                hashlock,
+                timeout_height,
+                status: "open".into(),
+            },
+        );
+        Ok(())
+    }
+
+    fn apply_escrow_claim(
+        &mut self,
+        claimer: &Address,
+        escrow_id: u64,
+        preimage: &[u8],
+        gas_used: &mut u64,
+    ) -> Result<(), StateError> {
+        *gas_used += 40_000;
+        let esc = self
+            .escrows
+            .get(&escrow_id)
+            .cloned()
+            .ok_or_else(|| StateError::InvalidTx("escrow missing".into()))?;
+        if esc.status != "open" {
+            return Err(StateError::InvalidTx("not open".into()));
+        }
+        if *claimer != esc.recipient {
+            return Err(StateError::InvalidTx("not recipient".into()));
+        }
+        let digest = hash_bytes(preimage);
+        if digest != esc.hashlock {
+            return Err(StateError::InvalidTx("bad preimage".into()));
+        }
+        if let Some(e) = self.escrows.get_mut(&escrow_id) {
+            e.status = "claimed".into();
+        }
+        if Self::is_native(&esc.asset) {
+            self.unlock_native(esc.amount);
+        }
+        self.credit_asset(&esc.recipient, &esc.asset, esc.amount);
+        Ok(())
+    }
+
+    fn apply_escrow_refund(
+        &mut self,
+        from: &Address,
+        escrow_id: u64,
+        gas_used: &mut u64,
+    ) -> Result<(), StateError> {
+        *gas_used += 35_000;
+        let esc = self
+            .escrows
+            .get(&escrow_id)
+            .cloned()
+            .ok_or_else(|| StateError::InvalidTx("escrow missing".into()))?;
+        if esc.status != "open" {
+            return Err(StateError::InvalidTx("not open".into()));
+        }
+        if *from != esc.sender {
+            return Err(StateError::InvalidTx("not sender".into()));
+        }
+        if self.height < esc.timeout_height {
+            return Err(StateError::InvalidTx("timeout not reached".into()));
+        }
+        if let Some(e) = self.escrows.get_mut(&escrow_id) {
+            e.status = "refunded".into();
+        }
+        if Self::is_native(&esc.asset) {
+            self.unlock_native(esc.amount);
+        }
+        self.credit_asset(&esc.sender, &esc.asset, esc.amount);
+        Ok(())
+    }
+
     fn apply_param(&mut self, key: &str, value: &str) -> Result<(), StateError> {
         match key {
             "epoch_length" => {
@@ -1872,5 +2611,128 @@ fn chrono_now() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
+}
+
+/// Integer square root (Babylonian method) for initial LP shares.
+fn integer_sqrt(n: u128) -> u128 {
+    if n == 0 {
+        return 0;
+    }
+    let mut x = n;
+    let mut y = x.saturating_add(1) / 2;
+    while y < x {
+        x = y;
+        y = (x + n / x) / 2;
+    }
+    x
+}
+
+#[cfg(test)]
+mod market_tests {
+    use super::*;
+    use aether_crypto::Keypair;
+
+    fn funded_state(alice: &Keypair, bob: &Keypair) -> ChainState {
+        let g = Genesis {
+            chain_id: "aether-test".into(),
+            alloc: vec![
+                GenesisAlloc {
+                    address: alice.address(),
+                    balance: 1_000_000 * WEI_PER_AETH,
+                },
+                GenesisAlloc {
+                    address: bob.address(),
+                    balance: 1_000_000 * WEI_PER_AETH,
+                },
+            ],
+            validators: vec![GenesisValidator {
+                address: alice.address(),
+                public_key: alice.public_bytes(),
+                power: 10_000 * WEI_PER_AETH,
+            }],
+            params: ChainParams::default(),
+            timestamp: 0,
+        };
+        ChainState::from_genesis(&g)
+    }
+
+    #[test]
+    fn brokerless_sell_fill_preserves_supply() {
+        let alice = Keypair::generate();
+        let bob = Keypair::generate();
+        let mut state = funded_state(&alice, &bob);
+        state.height = 1;
+
+        // Register quote asset for bob to hold
+        let mut gas = 0u64;
+        state
+            .apply_market_register(&bob.address(), "USD", 6, 10_000_000, &mut gas)
+            .unwrap();
+        let quote = state.assets.values().next().unwrap().asset_id;
+
+        // Alice sells 1000 wei AETH for quote at price 2 * PRICE_SCALE (2 quote per base)
+        gas = 0;
+        state
+            .apply_market_post(
+                &alice.address(),
+                OrderSide::Sell,
+                NATIVE_ASSET,
+                quote,
+                2 * PRICE_SCALE,
+                1_000,
+                0,
+                &mut gas,
+            )
+            .unwrap();
+        assert_eq!(state.market_locked_native, 1_000);
+        state.verify_supply_invariant().unwrap();
+
+        // Bob fills 500
+        gas = 0;
+        state
+            .apply_market_fill(&bob.address(), 1, 500, &mut gas)
+            .unwrap();
+        assert_eq!(state.market_locked_native, 500);
+        state.verify_supply_invariant().unwrap();
+    }
+
+    #[test]
+    fn amm_swap_roundtrip_k() {
+        let alice = Keypair::generate();
+        let bob = Keypair::generate();
+        let mut state = funded_state(&alice, &bob);
+        let mut gas = 0u64;
+        state
+            .apply_market_register(&alice.address(), "TKN", 9, 1_000_000, &mut gas)
+            .unwrap();
+        let tkn = state.assets.values().next().unwrap().asset_id;
+        gas = 0;
+        state
+            .apply_amm_create(
+                &alice.address(),
+                NATIVE_ASSET,
+                tkn,
+                10_000,
+                10_000,
+                30,
+                &mut gas,
+            )
+            .unwrap();
+        let pool_id = state.pools.values().next().unwrap().pool_id;
+        let k_before = {
+            let p = state.pools.values().next().unwrap();
+            p.reserve_a * p.reserve_b
+        };
+        gas = 0;
+        state
+            .apply_amm_swap(&bob.address(), pool_id, NATIVE_ASSET, 1_000, 1, &mut gas)
+            .unwrap();
+        let k_after = {
+            let p = state.pools.values().next().unwrap();
+            p.reserve_a * p.reserve_b
+        };
+        assert!(k_after >= k_before);
+        state.verify_supply_invariant().unwrap();
+    }
 }
 

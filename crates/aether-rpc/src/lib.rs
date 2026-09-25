@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 use aether_crypto::{block_hash, tx_hash};
 use aether_state::NodeLedger;
 use aether_store::{ChainStore, EpochSnapshot};
@@ -143,6 +145,13 @@ async fn rpc_handler(State(state): State<RpcState>, Json(req): Json<RpcRequest>)
         "aeth_getBridgePackets" => Ok(serde_json::to_value(state.ledger.state.read().bridge_packets.clone()).unwrap()),
         "aeth_getSlashLog" => Ok(serde_json::to_value(state.ledger.state.read().slash_log.clone()).unwrap()),
         "aeth_getCommunityPool" => Ok(json!(state.ledger.state.read().community_pool.to_string())),
+        "aeth_getOrders" => Ok(serde_json::to_value(state.ledger.state.read().orders.clone()).unwrap()),
+        "aeth_getOrder" => get_order(&state, req.params.as_ref()),
+        "aeth_getPools" => Ok(serde_json::to_value(state.ledger.state.read().pools.clone()).unwrap()),
+        "aeth_getEscrows" => Ok(serde_json::to_value(state.ledger.state.read().escrows.clone()).unwrap()),
+        "aeth_getAssets" => Ok(serde_json::to_value(state.ledger.state.read().assets.clone()).unwrap()),
+        "aeth_getAssetBalance" => get_asset_balance(&state, req.params.as_ref()),
+        "aeth_getMarketLocked" => Ok(json!(state.ledger.state.read().market_locked_native.to_string())),
         "aeth_version" => Ok(json!({
             "protocol": PROTOCOL_VERSION,
             "wire": WIRE_VERSION,
@@ -196,6 +205,11 @@ fn protocol_info(state: &RpcState) -> Value {
         "community_pool": s.community_pool.to_string(),
         "bridges": s.bridges.len(),
         "slash_events": s.slash_log.len(),
+        "orders": s.orders.len(),
+        "pools": s.pools.len(),
+        "escrows": s.escrows.len(),
+        "assets": s.assets.len(),
+        "market_locked_native": s.market_locked_native.to_string(),
         "features": {
             "shielded": true,
             "poseidon_notes": true,
@@ -209,6 +223,10 @@ fn protocol_info(state: &RpcState) -> Value {
             "slashing": true,
             "tip_to_proposer": true,
             "metrics": true,
+            "brokerless_markets": true,
+            "amm": true,
+            "htlc_escrow": true,
+            "batch_settlement": true,
         },
         "zk": {
             "shielded": "groth16-bn254",
@@ -401,6 +419,41 @@ fn get_account_proof(state: &RpcState, params: Option<&Value>) -> Result<Value, 
 fn get_balance(state: &RpcState, params: Option<&Value>) -> Result<Value, (i32, String)> {
     let addr = param_addr(params, 0)?;
     Ok(json!(state.ledger.state.read().get_balance(&addr).to_string()))
+}
+
+fn get_order(state: &RpcState, params: Option<&Value>) -> Result<Value, (i32, String)> {
+    let id = params
+        .and_then(|p| p.as_array())
+        .and_then(|a| a.first())
+        .and_then(|v| v.as_u64())
+        .ok_or((-32602, "order_id required".into()))?;
+    let s = state.ledger.state.read();
+    s.orders
+        .get(&id)
+        .map(|o| serde_json::to_value(o).unwrap())
+        .ok_or((-32004, "order not found".into()))
+}
+
+fn get_asset_balance(state: &RpcState, params: Option<&Value>) -> Result<Value, (i32, String)> {
+    let addr = param_addr(params, 0)?;
+    let asset_s = params
+        .and_then(|p| p.as_array())
+        .and_then(|a| a.get(1))
+        .and_then(|v| v.as_str())
+        .unwrap_or("0x0000000000000000000000000000000000000000000000000000000000000000");
+    let asset = parse_hash(asset_s).map_err(|e| (-32602, e))?;
+    let s = state.ledger.state.read();
+    let bal = if asset == aether_types::NATIVE_ASSET {
+        s.get_balance(&addr)
+    } else {
+        let key = format!("{}|{}", hex::encode(addr), hex::encode(asset));
+        s.asset_balances.get(&key).copied().unwrap_or(0)
+    };
+    Ok(json!({
+        "address": hex_addr(&addr),
+        "asset": hex_hash(&asset),
+        "balance": bal.to_string(),
+    }))
 }
 
 fn get_account(state: &RpcState, params: Option<&Value>) -> Result<Value, (i32, String)> {

@@ -1,6 +1,17 @@
 # Roadmap
 
-## v1.3.0 — Protocol density (**current**)
+## v1.4.0 — Brokerless markets (**current**)
+
+- [x] Limit order book (`MarketPost` / `Fill` / `Cancel`)
+- [x] Permissionless taker fills — no designated broker
+- [x] Constant-product AMM + LP shares
+- [x] HTLC escrow (open / claim / refund)
+- [x] `SettleBatch` multi-leg atomic clearing
+- [x] Asset registry + secondary balances
+- [x] Supply invariant includes `market_locked_native`
+- [x] Docs: `MARKETS.md`; wire v3
+
+## v1.3.0 — Protocol density
 
 - [x] Evidence txs + slashing / jail / tombstone
 - [x] Community pool + capped spends
@@ -17,13 +28,20 @@
 - [x] v0.2 — sled, governance, light headers, invariants
 - [x] v0.1 — hybrid L1 reference + ZK + rollups + explorer
 
-## v1.3.x — Hardened networking (next)
+## v1.4.x — Market hardening
+
+- [ ] Intent / RFQ gossip (signed intents off mempool)
+- [ ] Shielded fills (private amounts, public settlement)
+- [ ] Auto-expire sweeper for timed-out orders
+- [ ] TWAP / oracle adapters for AMM guards
+
+## v1.5 — Hardened networking
 
 - [ ] Noise XX + QUIC (libp2p)
 - [ ] RocksDB / production KV backend
 - [ ] Stake-weighted dialing + rate limits
 
-## v1.4 — Ceremony & audit track
+## Ceremony & audit track
 
 - [ ] MPC Groth16 (or Halo2) ceremony
 - [ ] Audited Poseidon parameter swap

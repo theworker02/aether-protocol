@@ -1,9 +1,9 @@
 # Aether Protocol — Core Specification
 
-**Version:** 1.3.0  
-**Status:** Diligence-ready reference — persistence, Poseidon notes, liquid staking, slashing, IBC-lite bridges, P2P mesh, snapshots, IP pack  
+**Version:** 1.4.0  
+**Status:** Diligence-ready reference — brokerless markets, persistence, Poseidon notes, liquid staking, slashing, IBC-lite bridges, P2P mesh, snapshots, IP pack  
 **License:** Apache-2.0 (see `NOTICE`, `docs/IP.md`, `docs/ACQUISITION.md`)  
-**Wire version:** `2`  
+**Wire version:** `3`  
 **Chain ID (devnet):** `aether-devnet-1`  
 **Native denomination:** `AETH` (1 AETH = 10^9 `wei`)
 
@@ -22,14 +22,22 @@ Aether is a **hybrid Layer-1 blockchain** that deliberately unifies several desi
 | Execution | On-chain smart contracts | External rollups settling to L1 |
 | Consensus | BFT Proof-of-Stake (AetherBFT) | Same engine, allowlisted validator set |
 | Sync | Full replay | Epoch snapshots + tip follow |
+| Markets | Brokerless CLOB + AMM | HTLC escrow + batch clearing |
 
 The protocol does **not** fork into separate networks for these modes. A single state machine, single block production pipeline, and single networking fabric carry all modes.
 
-**Companion documents:** `CONSENSUS.md`, `CRYPTOGRAPHY.md`, `NETWORKING.md`, `ECONOMICS.md`, `THREAT_MODEL.md`, `VM.md`, `ROLLUPS.md`, `ZK.md`, `LIGHT_CLIENT.md`, `GOVERNANCE.md`, `INVARIANTS.md`, `SYNC.md`, `ADAPTING.md`, `IP.md`, `ACQUISITION.md`, `PATENT_PLEDGE.md`, `BRIDGES.md`, `SLASHING.md`.
+**Companion documents:** `CONSENSUS.md`, `CRYPTOGRAPHY.md`, `NETWORKING.md`, `ECONOMICS.md`, `THREAT_MODEL.md`, `VM.md`, `ROLLUPS.md`, `ZK.md`, `LIGHT_CLIENT.md`, `GOVERNANCE.md`, `INVARIANTS.md`, `SYNC.md`, `ADAPTING.md`, `IP.md`, `ACQUISITION.md`, `PATENT_PLEDGE.md`, `BRIDGES.md`, `SLASHING.md`, `MARKETS.md`.
 
 ---
 
-## 0.1 Release 1.3 highlights
+## 0.1 Release 1.4 highlights
+
+1. **Brokerless markets** — limit book, permissionless fills, AMM, HTLC escrow, batch settlement. No central broker custody or matching venue.  
+2. Fungible asset registry + secondary balances.  
+3. Wire version **3**; protocol SemVer **1.4.0**.  
+4. Market locks counted in supply invariant (`market_locked_native`).  
+
+### Prior 1.3 highlights
 
 1. Evidence-based slashing (double-sign / downtime) with community pool.  
 2. IBC-lite bridge channels and ordered packets.  

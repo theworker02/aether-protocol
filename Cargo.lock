@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "aether-consensus"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "aether-crypto",
  "aether-types",
@@ -16,7 +16,7 @@ dependencies = [
 
 [[package]]
 name = "aether-crypto"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "aether-types",
  "blake3",
@@ -31,7 +31,7 @@ dependencies = [
 
 [[package]]
 name = "aether-node"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "aether-consensus",
  "aether-crypto",
@@ -57,7 +57,7 @@ dependencies = [
 
 [[package]]
 name = "aether-p2p"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "aether-consensus",
  "aether-crypto",
@@ -72,7 +72,7 @@ dependencies = [
 
 [[package]]
 name = "aether-protocol-cli"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "aether-crypto",
  "aether-types",
@@ -91,7 +91,7 @@ dependencies = [
 
 [[package]]
 name = "aether-rpc"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "aether-consensus",
  "aether-crypto",
@@ -111,7 +111,7 @@ dependencies = [
 
 [[package]]
 name = "aether-state"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "aether-consensus",
  "aether-crypto",
@@ -131,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "aether-store"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "aether-crypto",
  "aether-state",
@@ -146,7 +146,7 @@ dependencies = [
 
 [[package]]
 name = "aether-types"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "chrono",
  "hex",
@@ -157,7 +157,7 @@ dependencies = [
 
 [[package]]
 name = "aether-vm"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "aether-crypto",
  "aether-types",
@@ -167,7 +167,7 @@ dependencies = [
 
 [[package]]
 name = "aether-zk"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "aether-crypto",
  "aether-types",

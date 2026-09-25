@@ -5,16 +5,16 @@
 <h1 align="center">Aether Protocol</h1>
 
 <p align="center">
-  <strong>Hybrid Layer-1 · v1.3.0</strong><br/>
+  <strong>Hybrid Layer-1 · v1.4.0</strong><br/>
   Public commons + federated finality · account + UTXO · Poseidon/Groth16 shielded notes ·
-  liquid staking · slashing · IBC-lite bridges · rollup settlement · epoch snapshots ·
-  multi-validator mesh — one chain ID.
+  liquid staking · slashing · IBC-lite bridges · <em>brokerless markets</em> · rollup settlement ·
+  epoch snapshots · multi-validator mesh — one chain ID.
 </p>
 
 <p align="center">
   <a href="https://github.com/theworker02/aether-protocol/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/theworker02/aether-protocol/ci.yml?branch=main&style=for-the-badge&label=CI" alt="CI" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-0f6b5c?style=for-the-badge" alt="License" /></a>
-  <a href="docs/PROTOCOL.md"><img src="https://img.shields.io/badge/spec-v1.3.0-c8f542?style=for-the-badge&labelColor=0b1c1a" alt="Spec" /></a>
+  <a href="docs/PROTOCOL.md"><img src="https://img.shields.io/badge/spec-v1.4.0-c8f542?style=for-the-badge&labelColor=0b1c1a" alt="Spec" /></a>
   <a href="docs/ZK.md"><img src="https://img.shields.io/badge/zk-Poseidon%20%2B%20Groth16-0f6b5c?style=for-the-badge" alt="ZK" /></a>
   <a href="docs/ACQUISITION.md"><img src="https://img.shields.io/badge/diligence-acquisition%20pack-c8f542?style=for-the-badge&labelColor=0b1c1a" alt="Acquisition" /></a>
   <a href="docs/IP.md"><img src="https://img.shields.io/badge/IP-Apache%20%2B%20patent%20pledge-0f6b5c?style=for-the-badge" alt="IP" /></a>
@@ -55,7 +55,14 @@ Most chains force a single trade-off: public *or* permissioned, accounts *or* UT
 
 ---
 
-## What's in 1.3.0
+## What's in 1.4.0
+
+- **Brokerless markets** — on-chain CLOB + AMM + HTLC escrow; no central broker
+- Permissionless `MarketFillOrder` (atomic delivery-vs-payment)
+- `SettleBatch` multi-leg clearing; asset registry
+- See [docs/MARKETS.md](docs/MARKETS.md)
+
+### From 1.3.0
 
 - Slashing + evidence txs, tombstones, community pool
 - IBC-lite bridges (open/send/recv/ack)
@@ -78,7 +85,7 @@ Most chains force a single trade-off: public *or* permissioned, accounts *or* UT
 │           │                                                  │
 │           ▼                                                  │
 │  AetherBFT (PoS) ──► Execution                               │
-│    Account | UTXO | VM | Poseidon notes | Rollups | Stake    │
+│    Account | UTXO | VM | Poseidon notes | Rollups | Stake | Markets     │
 │           │                                                  │
 │           ▼                                                  │
 │  Composite state root · Commit cert · TCP gossip mesh        │

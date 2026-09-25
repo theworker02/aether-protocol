@@ -1,7 +1,7 @@
 # Economics & Tokenomics
 
 **Companion to:** `PROTOCOL.md`  
-**Version:** 1.2.0  
+**Version:** 1.4.0  
 **Unit:** 1 AETH = 1_000_000_000 wei (`10^9`).
 
 ---
@@ -112,6 +112,14 @@ Deposits locked in I1 until reject/enact.
 
 ---
 
-## 8. Acquisition note
+## 9. Brokerless market fees
+
+Market txs pay gas only in the reference (no protocol taker fee). Optional pool `fee_bps` stays inside the AMM curve. Locked AETH in orders/AMM/escrow is counted in I1 via `market_locked_native`.
+
+See `MARKETS.md`.
+
+---
+
+## 10. Acquisition note
 
 Token design here is **protocol mechanics**, not a securities offering. Commercial packaging lives in `ACQUISITION.md` / `IP.md`.

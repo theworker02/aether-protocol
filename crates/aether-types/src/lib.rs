@@ -9,9 +9,13 @@ pub const EPOCH_LENGTH: u64 = 100;
 pub const ADDRESS_LEN: usize = 20;
 pub const HASH_LEN: usize = 32;
 /// Wire + package SemVer for this release line.
-pub const PROTOCOL_VERSION: &str = "1.3.0";
+pub const PROTOCOL_VERSION: &str = "1.4.0";
 /// Monotonic header/tx wire version (breaking bumps only).
-pub const WIRE_VERSION: u32 = 2;
+pub const WIRE_VERSION: u32 = 3;
+/// Native AETH asset id (all-zero hash). Brokerless markets use this as base/quote.
+pub const NATIVE_ASSET: Hash256 = [0u8; HASH_LEN];
+/// Price scale: `quote = base * price_num / PRICE_SCALE` (fixed-point).
+pub const PRICE_SCALE: u128 = 1_000_000_000;
 /// Double-sign slash in basis points (5% = 500).
 pub const SLASH_DOUBLE_SIGN_BPS: u16 = 500;
 /// Downtime slash in basis points (0.01% = 1).
@@ -245,6 +249,141 @@ pub enum TxKind {
         amount: u128,
         memo: String,
     },
+    // ── Brokerless markets (no central broker / matching venue) ──────────
+    /// Register a fungible asset; issuer receives `supply` in their wallet.
+    MarketRegisterAsset {
+        symbol: String,
+        decimals: u8,
+        supply: u128,
+    },
+    /// Post a limit order; locks maker funds on-chain until fill/cancel/expiry.
+    MarketPostOrder {
+        side: OrderSide,
+        base: Hash256,
+        quote: Hash256,
+        /// Quote units per `PRICE_SCALE` base units.
+        price_num: u128,
+        amount: u128,
+        expiry_height: u64,
+    },
+    /// Cancel an open order; unlocks remaining maker funds.
+    MarketCancelOrder {
+        order_id: u64,
+    },
+    /// Anyone may fill (taker). Atomic delivery-vs-payment — replaces a broker.
+    MarketFillOrder {
+        order_id: u64,
+        amount: u128,
+    },
+    /// Create a constant-product AMM pool (`x * y = k`) with fee in bps.
+    AmmCreatePool {
+        asset_a: Hash256,
+        asset_b: Hash256,
+        amount_a: u128,
+        amount_b: u128,
+        fee_bps: u16,
+    },
+    /// Add liquidity; mint LP shares proportional to reserves.
+    AmmAddLiquidity {
+        pool_id: Hash256,
+        amount_a: u128,
+        amount_b: u128,
+    },
+    /// Burn LP shares; withdraw proportional reserves.
+    AmmRemoveLiquidity {
+        pool_id: Hash256,
+        lp_shares: u128,
+    },
+    /// Swap against the pool; min_out is slippage protection.
+    AmmSwap {
+        pool_id: Hash256,
+        asset_in: Hash256,
+        amount_in: u128,
+        min_out: u128,
+    },
+    /// Open a hashlocked escrow (HTLC) for P2P atomic settlement.
+    EscrowOpen {
+        recipient: Address,
+        asset: Hash256,
+        amount: u128,
+        hashlock: Hash256,
+        timeout_height: u64,
+    },
+    /// Claim escrow with preimage (`BLAKE3(preimage) == hashlock`).
+    EscrowClaim {
+        escrow_id: u64,
+        preimage: Vec<u8>,
+    },
+    /// Refund escrow after timeout (sender only).
+    EscrowRefund {
+        escrow_id: u64,
+    },
+    /// Atomically fill many resting orders in one tx (batch clearing, no broker).
+    SettleBatch {
+        fills: Vec<SettleFill>,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OrderSide {
+    Buy,
+    Sell,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SettleFill {
+    pub order_id: u64,
+    pub amount: u128,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AssetMeta {
+    pub asset_id: Hash256,
+    pub symbol: String,
+    pub decimals: u8,
+    pub issuer: Address,
+    pub total_supply: u128,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LimitOrder {
+    pub id: u64,
+    pub maker: Address,
+    pub side: OrderSide,
+    pub base: Hash256,
+    pub quote: Hash256,
+    pub price_num: u128,
+    pub amount_remaining: u128,
+    pub expiry_height: u64,
+    /// Native AETH (or other native-side) locked against this order.
+    pub locked_native: u128,
+    pub status: String, // open | filled | cancelled | expired
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AmmPool {
+    pub pool_id: Hash256,
+    pub asset_a: Hash256,
+    pub asset_b: Hash256,
+    pub reserve_a: u128,
+    pub reserve_b: u128,
+    pub lp_supply: u128,
+    pub fee_bps: u16,
+    /// address_hex → LP shares
+    pub lp_shares: std::collections::BTreeMap<String, u128>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Escrow {
+    pub id: u64,
+    pub sender: Address,
+    pub recipient: Address,
+    pub asset: Hash256,
+    pub amount: u128,
+    pub hashlock: Hash256,
+    pub timeout_height: u64,
+    pub status: String, // open | claimed | refunded
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

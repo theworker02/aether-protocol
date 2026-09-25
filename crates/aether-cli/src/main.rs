@@ -101,6 +101,76 @@ enum Commands {
         #[arg(long, default_value = "1")]
         scheme: u8,
     },
+    /// Register a fungible asset (brokerless markets)
+    MarketRegister {
+        #[arg(long)]
+        secret: String,
+        #[arg(long)]
+        symbol: String,
+        #[arg(long, default_value = "9")]
+        decimals: u8,
+        #[arg(long)]
+        supply: u128,
+    },
+    /// Post a limit order (locks maker funds; no broker)
+    MarketPost {
+        #[arg(long)]
+        secret: String,
+        #[arg(long)]
+        side: String,
+        #[arg(long, default_value = "0x0000000000000000000000000000000000000000000000000000000000000000")]
+        base: String,
+        #[arg(long)]
+        quote: String,
+        #[arg(long)]
+        price_num: u128,
+        #[arg(long)]
+        amount: u128,
+        #[arg(long, default_value = "0")]
+        expiry_height: u64,
+    },
+    /// Fill a resting order as taker (atomic DvP)
+    MarketFill {
+        #[arg(long)]
+        secret: String,
+        #[arg(long)]
+        order_id: u64,
+        #[arg(long)]
+        amount: u128,
+    },
+    /// Cancel an open order
+    MarketCancel {
+        #[arg(long)]
+        secret: String,
+        #[arg(long)]
+        order_id: u64,
+    },
+    /// List open orders / pools / escrows
+    Markets,
+    /// Open HTLC escrow for P2P settlement
+    EscrowOpen {
+        #[arg(long)]
+        secret: String,
+        #[arg(long)]
+        recipient: String,
+        #[arg(long, default_value = "0x0000000000000000000000000000000000000000000000000000000000000000")]
+        asset: String,
+        #[arg(long)]
+        amount: u128,
+        #[arg(long)]
+        preimage_hex: String,
+        #[arg(long)]
+        timeout_height: u64,
+    },
+    /// Claim HTLC with preimage
+    EscrowClaim {
+        #[arg(long)]
+        secret: String,
+        #[arg(long)]
+        escrow_id: u64,
+        #[arg(long)]
+        preimage_hex: String,
+    },
 }
 
 #[tokio::main]
@@ -399,6 +469,199 @@ async fn main() -> Result<()> {
             let h = rpc(&cli.rpc, "aeth_sendRawTransaction", json!([tx])).await?;
             println!("submitted: {}", h);
             println!("post_state_root: {}", hex_hash(&post));
+        }
+        Commands::MarketRegister {
+            secret,
+            symbol,
+            decimals,
+            supply,
+        } => {
+            let kp = kp_from_secret(&secret)?;
+            let from = kp.address();
+            let acct = rpc(&cli.rpc, "aeth_getAccount", json!([hex_addr(&from)])).await?;
+            let nonce = acct["nonce"].as_u64().unwrap_or(0);
+            let mut tx = Transaction {
+                version: 1,
+                nonce,
+                origin: Origin::Account { from },
+                kind: TxKind::MarketRegisterAsset {
+                    symbol,
+                    decimals,
+                    supply,
+                },
+                gas_limit: 120_000,
+                max_fee_per_gas: 10_000,
+                max_priority_fee_per_gas: 1,
+                signature: vec![],
+                public_key: vec![],
+            };
+            sign_tx(&mut tx, &kp)?;
+            let h = rpc(&cli.rpc, "aeth_sendRawTransaction", json!([tx])).await?;
+            println!("submitted: {}", h);
+        }
+        Commands::MarketPost {
+            secret,
+            side,
+            base,
+            quote,
+            price_num,
+            amount,
+            expiry_height,
+        } => {
+            let kp = kp_from_secret(&secret)?;
+            let from = kp.address();
+            let acct = rpc(&cli.rpc, "aeth_getAccount", json!([hex_addr(&from)])).await?;
+            let nonce = acct["nonce"].as_u64().unwrap_or(0);
+            let side = match side.to_lowercase().as_str() {
+                "buy" => OrderSide::Buy,
+                "sell" => OrderSide::Sell,
+                _ => bail!("side must be buy|sell"),
+            };
+            let mut tx = Transaction {
+                version: 1,
+                nonce,
+                origin: Origin::Account { from },
+                kind: TxKind::MarketPostOrder {
+                    side,
+                    base: parse_hash(&base).map_err(|e| anyhow::anyhow!(e))?,
+                    quote: parse_hash(&quote).map_err(|e| anyhow::anyhow!(e))?,
+                    price_num,
+                    amount,
+                    expiry_height,
+                },
+                gas_limit: 150_000,
+                max_fee_per_gas: 10_000,
+                max_priority_fee_per_gas: 1,
+                signature: vec![],
+                public_key: vec![],
+            };
+            sign_tx(&mut tx, &kp)?;
+            let h = rpc(&cli.rpc, "aeth_sendRawTransaction", json!([tx])).await?;
+            println!("submitted: {}", h);
+        }
+        Commands::MarketFill {
+            secret,
+            order_id,
+            amount,
+        } => {
+            let kp = kp_from_secret(&secret)?;
+            let from = kp.address();
+            let acct = rpc(&cli.rpc, "aeth_getAccount", json!([hex_addr(&from)])).await?;
+            let nonce = acct["nonce"].as_u64().unwrap_or(0);
+            let mut tx = Transaction {
+                version: 1,
+                nonce,
+                origin: Origin::Account { from },
+                kind: TxKind::MarketFillOrder { order_id, amount },
+                gas_limit: 150_000,
+                max_fee_per_gas: 10_000,
+                max_priority_fee_per_gas: 1,
+                signature: vec![],
+                public_key: vec![],
+            };
+            sign_tx(&mut tx, &kp)?;
+            let h = rpc(&cli.rpc, "aeth_sendRawTransaction", json!([tx])).await?;
+            println!("submitted: {}", h);
+        }
+        Commands::MarketCancel { secret, order_id } => {
+            let kp = kp_from_secret(&secret)?;
+            let from = kp.address();
+            let acct = rpc(&cli.rpc, "aeth_getAccount", json!([hex_addr(&from)])).await?;
+            let nonce = acct["nonce"].as_u64().unwrap_or(0);
+            let mut tx = Transaction {
+                version: 1,
+                nonce,
+                origin: Origin::Account { from },
+                kind: TxKind::MarketCancelOrder { order_id },
+                gas_limit: 100_000,
+                max_fee_per_gas: 10_000,
+                max_priority_fee_per_gas: 1,
+                signature: vec![],
+                public_key: vec![],
+            };
+            sign_tx(&mut tx, &kp)?;
+            let h = rpc(&cli.rpc, "aeth_sendRawTransaction", json!([tx])).await?;
+            println!("submitted: {}", h);
+        }
+        Commands::Markets => {
+            let orders = rpc(&cli.rpc, "aeth_getOrders", json!([])).await?;
+            let pools = rpc(&cli.rpc, "aeth_getPools", json!([])).await?;
+            let escrows = rpc(&cli.rpc, "aeth_getEscrows", json!([])).await?;
+            let assets = rpc(&cli.rpc, "aeth_getAssets", json!([])).await?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "orders": orders,
+                    "pools": pools,
+                    "escrows": escrows,
+                    "assets": assets,
+                }))?
+            );
+        }
+        Commands::EscrowOpen {
+            secret,
+            recipient,
+            asset,
+            amount,
+            preimage_hex,
+            timeout_height,
+        } => {
+            use aether_crypto::hash_bytes;
+            let kp = kp_from_secret(&secret)?;
+            let from = kp.address();
+            let preimage = hex::decode(preimage_hex.strip_prefix("0x").unwrap_or(&preimage_hex))?;
+            let hashlock = hash_bytes(&preimage);
+            let acct = rpc(&cli.rpc, "aeth_getAccount", json!([hex_addr(&from)])).await?;
+            let nonce = acct["nonce"].as_u64().unwrap_or(0);
+            let mut tx = Transaction {
+                version: 1,
+                nonce,
+                origin: Origin::Account { from },
+                kind: TxKind::EscrowOpen {
+                    recipient: parse_addr(&recipient).map_err(|e| anyhow::anyhow!(e))?,
+                    asset: parse_hash(&asset).map_err(|e| anyhow::anyhow!(e))?,
+                    amount,
+                    hashlock,
+                    timeout_height,
+                },
+                gas_limit: 120_000,
+                max_fee_per_gas: 10_000,
+                max_priority_fee_per_gas: 1,
+                signature: vec![],
+                public_key: vec![],
+            };
+            sign_tx(&mut tx, &kp)?;
+            let h = rpc(&cli.rpc, "aeth_sendRawTransaction", json!([tx])).await?;
+            println!("submitted: {}", h);
+            println!("hashlock: {}", hex_hash(&hashlock));
+        }
+        Commands::EscrowClaim {
+            secret,
+            escrow_id,
+            preimage_hex,
+        } => {
+            let kp = kp_from_secret(&secret)?;
+            let from = kp.address();
+            let preimage = hex::decode(preimage_hex.strip_prefix("0x").unwrap_or(&preimage_hex))?;
+            let acct = rpc(&cli.rpc, "aeth_getAccount", json!([hex_addr(&from)])).await?;
+            let nonce = acct["nonce"].as_u64().unwrap_or(0);
+            let mut tx = Transaction {
+                version: 1,
+                nonce,
+                origin: Origin::Account { from },
+                kind: TxKind::EscrowClaim {
+                    escrow_id,
+                    preimage,
+                },
+                gas_limit: 100_000,
+                max_fee_per_gas: 10_000,
+                max_priority_fee_per_gas: 1,
+                signature: vec![],
+                public_key: vec![],
+            };
+            sign_tx(&mut tx, &kp)?;
+            let h = rpc(&cli.rpc, "aeth_sendRawTransaction", json!([tx])).await?;
+            println!("submitted: {}", h);
         }
     }
     Ok(())

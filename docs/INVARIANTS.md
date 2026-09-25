@@ -17,6 +17,7 @@ transparent_liquid
   + fee_burned_cumulative
   + gov_deposits_locked
   + community_pool
+  + market_locked_native
   == genesis_supply
 ```
 

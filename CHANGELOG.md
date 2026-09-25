@@ -2,6 +2,20 @@
 
 All notable changes to Aether Protocol are documented here.
 
+## [1.4.0] — 2026-09-24
+
+### Added
+- **Brokerless markets:** limit book, permissionless fills, AMM (`x*y=k`), HTLC escrow, `SettleBatch`
+- Asset registry (`MarketRegisterAsset`) + secondary `asset_balances`
+- RPC: `aeth_getOrders`, `aeth_getOrder`, `aeth_getPools`, `aeth_getEscrows`, `aeth_getAssets`, `aeth_getAssetBalance`, `aeth_getMarketLocked`
+- CLI: `market-register`, `market-post`, `market-fill`, `market-cancel`, `markets`, `escrow-open`, `escrow-claim`
+- Docs: `MARKETS.md`
+
+### Changed
+- Package + protocol SemVer **1.4.0**; wire version **3**
+- Supply invariant includes `market_locked_native`
+- CLI crate published as `aether-protocol-cli` (name collision on crates.io)
+
 ## [1.3.0] — 2026-09-24
 
 ### Added
