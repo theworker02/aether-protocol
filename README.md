@@ -264,3 +264,16 @@ Colors: Ink `#0b1c1a` · Teal `#0f6b5c` · Signal `#c8f542` · Fog `#e8f2ef`
 <p align="center">
   <sub>Aether Protocol 1.2 — one chain, many modes.</sub>
 </p>
+
+## Badges & release notes
+
+| Badge | Meaning |
+| --- | --- |
+| docs live | Public documentation / Pages surface for `aether-protocol` |
+| release v1.0.0 | Stable tagged release with narrative notes |
+| license | See repository `LICENSE` for terms |
+| status maintained | Actively kept in the @theworker02 portfolio |
+| version 1.0.0 | Documentation and brand completeness milestone |
+| pages enabled | Site intended at `https://theworker02.github.io/aether-protocol/` |
+
+Detailed narrative for the stable line lives in [CHANGELOG.md](./CHANGELOG.md) and the [v1.0.0 GitHub Release](https://github.com/theworker02/aether-protocol/releases/tag/v1.0.0).
