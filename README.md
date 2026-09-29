@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="docs/logo.svg" alt="aether-protocol official logo" width="128" height="128">
+</p>
+
+<p align="center">
   <img src="assets/brand/logo.svg" alt="Aether Protocol" width="128" height="128" />
 </p>
 
